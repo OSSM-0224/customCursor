@@ -1,67 +1,3 @@
-const cursor = document.querySelector(".shirt-cursor");
-const leftSleeve = document.querySelector(".sleeve-left");
-const rightSleeve = document.querySelector(".sleeve-right");
-
-let targetX = window.innerWidth / 2;
-let targetY = window.innerHeight / 2;
-let x = targetX;
-let y = targetY;
-let lastX = targetX;
-let lastY = targetY;
-let velocityX = 0;
-let velocityY = 0;
-let shirtTilt = 0;
-let leftAngle = 0;
-let rightAngle = 0;
-
-window.addEventListener("mousemove", (event) => {
-  targetX = event.clientX;
-  targetY = event.clientY;
-  cursor.classList.add("is-visible");
-});
-
-document.documentElement.addEventListener("mouseleave", () => {
-  cursor.classList.remove("is-visible");
-});
-
-function animate() {
-  // Main shirt smoothly follows the pointer with a little inertia.
-  x += (targetX - x) * 0.17;
-  y += (targetY - y) * 0.17;
-
-  velocityX = targetX - lastX;
-  velocityY = targetY - lastY;
-
-  // Clamp the rotation so fast mouse movements do not flip the shirt.
-  const speedTilt = Math.max(-12, Math.min(12, velocityX * 0.22));
-  shirtTilt += (speedTilt - shirtTilt) * 0.10;
-
-  // Each sleeve gets its own delayed swing, like loose fabric.
-  const leftTarget = Math.max(-13, Math.min(13, -velocityX * 0.28 + velocityY * 0.08));
-  const rightTarget = Math.max(-13, Math.min(13, velocityX * 0.25 - velocityY * 0.06));
-  leftAngle += (leftTarget - leftAngle) * 0.13;
-  rightAngle += (rightTarget - rightAngle) * 0.11;
-
-  // Gentle idle float remains even when the mouse stops.
-  const time = performance.now();
-  const bob = Math.sin(time * 0.0035) * 2.5;
-  const idleSway = Math.sin(time * 0.0025) * 1.4;
-
-  cursor.style.transform =
-    `translate3d(${x}px, ${y + bob}px, 0) ` +
-    `translate(-50%, -50%) rotate(${shirtTilt + idleSway}deg)`;
-
-  leftSleeve.style.transform = `rotate(${leftAngle + Math.sin(time * 0.004) * 1.2}deg)`;
-  rightSleeve.style.transform = `rotate(${rightAngle - Math.sin(time * 0.0042) * 1.2}deg)`;
-
-  lastX = targetX;
-  lastY = targetY;
-  requestAnimationFrame(animate);
-}
-
-animate();
-
-
 (() => {
   "use strict";
 
@@ -71,8 +7,21 @@ animate();
   const dot = document.getElementById("cursor-dot");
   const label = document.getElementById("cursor-label");
   const image = document.getElementById("cursor-image");
+  const leftSleeve = document.getElementById("cursor-sleeve-left");
+  const rightSleeve = document.getElementById("cursor-sleeve-right");
 
-  if (!root || !shirt || !float || !dot || !label || !image) return;
+  if (
+    !root ||
+    !shirt ||
+    !float ||
+    !dot ||
+    !label ||
+    !image ||
+    !leftSleeve ||
+    !rightSleeve
+  ) {
+    return;
+  }
 
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -87,6 +36,10 @@ animate();
     maxTilt: 14,
     bankFactor: 0.004,
     maxBank: 8,
+    sleeveFactorX: 0.006,
+    sleeveFactorY: 0.003,
+    maxSleeveTilt: 8,
+    sleeveStretch: 0.005,
     hoverScale: 1.045,
     pressScale: 0.94,
     dotScale: 2.2,
@@ -110,6 +63,8 @@ animate();
     vy: 0,
     tilt: 0,
     bank: 0,
+    leftAngle: 0,
+    rightAngle: 0,
     scale: 1,
     dotScale: 1,
     hovered: false,
@@ -159,6 +114,8 @@ animate();
     shirt.style.transform = `translate3d(${state.x}px, ${state.y}px, 0)`;
     float.style.transform =
       "translate3d(0px, 0px, 0) rotate(0deg) rotateY(0deg) scale(1)";
+    leftSleeve.style.transform = "rotate(0deg) scale(1)";
+    rightSleeve.style.transform = "rotate(0deg) scale(1)";
     dot.style.transform =
       `translate3d(${state.targetX}px, ${state.targetY}px, 0) ` +
       `translate(-50%, -50%) scale(${state.dotScale})`;
@@ -178,6 +135,25 @@ animate();
     state.tilt = damp(state.tilt, wantedTilt, state.hovered ? 14 : 8, dt);
     state.bank = damp(state.bank, wantedBank, 8, dt);
 
+    const wantedLeft = state.hovered
+      ? 0
+      : clamp(
+          state.vx * CONFIG.sleeveFactorX + state.vy * CONFIG.sleeveFactorY,
+          -CONFIG.maxSleeveTilt,
+          CONFIG.maxSleeveTilt,
+        );
+    const wantedRight = state.hovered
+      ? 0
+      : clamp(
+          state.vx * CONFIG.sleeveFactorX - state.vy * CONFIG.sleeveFactorY,
+          -CONFIG.maxSleeveTilt,
+          CONFIG.maxSleeveTilt,
+        );
+    const sleeveEase = state.hovered ? 14 : 7;
+
+    state.leftAngle = damp(state.leftAngle, wantedLeft, sleeveEase, dt);
+    state.rightAngle = damp(state.rightAngle, wantedRight, sleeveEase, dt);
+
     const wantedScale = state.pressed
       ? CONFIG.pressScale
       : state.hovered
@@ -192,6 +168,9 @@ animate();
     const bobY = Math.sin(time * 1.25) * 3.4 * calm;
     const idleTilt = Math.sin(time * 0.8) * 1.1 * calm;
     const idleBank = Math.sin(time * 1.05) * 2.6 * calm;
+    const idleSleeve = Math.sin(time * 1.05) * 0.7 * calm;
+    const leftAngle = state.leftAngle + idleSleeve;
+    const rightAngle = state.rightAngle - idleSleeve;
 
     shirt.style.transform =
       `translate3d(${state.x.toFixed(2)}px, ${state.y.toFixed(2)}px, 0)`;
@@ -201,6 +180,14 @@ animate();
       `rotate(${(state.tilt + idleTilt).toFixed(2)}deg) ` +
       `rotateY(${(state.bank + idleBank).toFixed(2)}deg) ` +
       `scale(${state.scale.toFixed(3)})`;
+
+    leftSleeve.style.transform =
+      `rotate(${leftAngle.toFixed(2)}deg) ` +
+      `scale(${(1 + Math.abs(state.leftAngle) * CONFIG.sleeveStretch).toFixed(3)})`;
+
+    rightSleeve.style.transform =
+      `rotate(${rightAngle.toFixed(2)}deg) ` +
+      `scale(${(1 + Math.abs(state.rightAngle) * CONFIG.sleeveStretch).toFixed(3)})`;
 
     dot.style.transform =
       `translate3d(${state.targetX}px, ${state.targetY}px, 0) ` +
@@ -326,6 +313,8 @@ animate();
     state.vy = 0;
     state.tilt = 0;
     state.bank = 0;
+    state.leftAngle = 0;
+    state.rightAngle = 0;
     state.scale = 1;
     state.dotScale = state.hovered ? CONFIG.dotScale : 1;
 
@@ -444,18 +433,28 @@ animate();
     deactivate();
   }
 
-  function initImage() {
-    if (image.complete) {
-      if (image.naturalWidth > 0) {
-        markReady();
-      } else {
-        markFailed();
-      }
+  const images = [image, leftSleeve, rightSleeve];
+
+  function checkLoaded() {
+    if (images.every((img) => img.complete && img.naturalWidth > 0)) {
+      markReady();
       return;
     }
 
-    image.addEventListener("load", markReady, { once: true });
-    image.addEventListener("error", markFailed, { once: true });
+    if (images.some((img) => img.complete && img.naturalWidth === 0)) {
+      markFailed();
+    }
+  }
+
+  function initImages() {
+    images.forEach((img) => {
+      if (img.complete) return;
+
+      img.addEventListener("load", checkLoaded, { once: true });
+      img.addEventListener("error", checkLoaded, { once: true });
+    });
+
+    checkLoaded();
   }
 
   window.addEventListener("pointermove", onPointerMove, { passive: true });
@@ -472,5 +471,5 @@ animate();
   finePointer.addEventListener("change", onModeChange);
   reducedMotion.addEventListener("change", onModeChange);
 
-  initImage();
+  initImages();
 })();
