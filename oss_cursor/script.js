@@ -55,13 +55,13 @@
     spawnX: 34,
     spawnY: 26,
     threadLife: 620,
-    threadLengthRatio: 1.5,
-    threadMinLength: 46,
-    threadWidthRatio: 0.032,
-    threadMinWidth: 1.2,
-    threadMaxWidth: 3,
+    threadLengthRatio: 1.85,
+    threadMinLength: 60,
+    threadWidthRatio: 0.044,
+    threadMinWidth: 1.6,
+    threadMaxWidth: 4.2,
     threadStepRatio: 0.03,
-    threadMaxPoints: 40,
+    threadMaxPoints: 56,
   };
 
   const state = {
@@ -246,8 +246,60 @@
       });
     }
 
-    threadCtx.globalAlpha = 0.88 * strength;
     threadCtx.fillStyle = supportsDifference ? "#ffffff" : "#161616";
+
+    // A bundle of loose hem threads: five companions plus the main strand.
+    const strands = [
+      { width: 0.52, alpha: 0.5, spread: -2.8, sag: 1.6, trim: 0 },
+      { width: 0.4, alpha: 0.42, spread: -1.6, sag: 2.6, trim: 2 },
+      { width: 0.34, alpha: 0.34, spread: -0.5, sag: 3.4, trim: 1 },
+      { width: 0.46, alpha: 0.44, spread: 1.3, sag: 1.2, trim: 3 },
+      { width: 0.32, alpha: 0.36, spread: 2.5, sag: 2.2, trim: 0 },
+    ];
+
+    for (const strand of strands) {
+      const sLeft = [];
+      const sRight = [];
+      const first = Math.min(strand.trim, count - 2);
+
+      for (let i = first; i < count; i += 1) {
+        const prev = pointsOut[Math.max(0, i - 1)];
+        const next = pointsOut[Math.min(count - 1, i + 1)];
+
+        let tx = next.x - prev.x;
+        let ty = next.y - prev.y;
+        const length = Math.hypot(tx, ty) || 1;
+        tx /= length;
+        ty /= length;
+
+        const u = i / (count - 1);
+        const su = (i - first) / (count - 1 - first);
+        const drift = strand.spread * (1 - u);
+        const cx = pointsOut[i].x - ty * drift;
+        const cy = pointsOut[i].y + tx * drift + strand.sag * (1 - u);
+        const half = (headWidth * strand.width * Math.pow(su, 0.9)) / 2;
+
+        sLeft.push({ x: cx - ty * half, y: cy + tx * half });
+        sRight.push({ x: cx + ty * half, y: cy - tx * half });
+      }
+
+      threadCtx.globalAlpha = strand.alpha * strength;
+      threadCtx.beginPath();
+      threadCtx.moveTo(sLeft[0].x, sLeft[0].y);
+
+      for (let i = 1; i < sLeft.length; i += 1) {
+        threadCtx.lineTo(sLeft[i].x, sLeft[i].y);
+      }
+
+      for (let i = sRight.length - 1; i >= 0; i -= 1) {
+        threadCtx.lineTo(sRight[i].x, sRight[i].y);
+      }
+
+      threadCtx.closePath();
+      threadCtx.fill();
+    }
+
+    threadCtx.globalAlpha = 0.9 * strength;
 
     threadCtx.beginPath();
     threadCtx.moveTo(left[0].x, left[0].y);
@@ -274,7 +326,7 @@
     );
     threadCtx.fill();
 
-    // Two short frayed fibres at the tail.
+    // A few short frayed fibres at the tail.
     const tail = pointsOut[0];
     const nextPoint = pointsOut[1];
 
@@ -286,12 +338,12 @@
       dx /= tailLength;
       dy /= tailLength;
 
-      const fibreLength = Math.min(6, state.shirtW * 0.1);
-      threadCtx.globalAlpha = 0.4 * strength;
-      threadCtx.lineWidth = Math.max(0.4, headWidth * 0.28);
+      const fibreLength = Math.min(8, state.shirtW * 0.13);
+      threadCtx.globalAlpha = 0.45 * strength;
+      threadCtx.lineWidth = Math.max(0.45, headWidth * 0.24);
       threadCtx.lineCap = "round";
 
-      for (const spread of [-0.28, 0.24]) {
+      for (const spread of [-0.34, -0.05, 0.26]) {
         const cos = Math.cos(spread);
         const sin = Math.sin(spread);
 
@@ -436,7 +488,7 @@
     // that the float uses above.
     const originX = state.shirtW * 0.52;
     const originY = state.shirtH * 0.46;
-    const hemLocalX = (state.shirtW * 0.44 - originX) * state.scale;
+    const hemLocalX = (state.shirtW * 0.5 - originX) * state.scale;
     const hemLocalY = (state.shirtH * 0.88 - originY) * state.scale;
     const threadRotation = ((state.tilt + idleTilt) * Math.PI) / 180;
     const threadBank = ((state.bank + idleBank) * Math.PI) / 180;
