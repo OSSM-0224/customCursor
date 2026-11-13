@@ -62,7 +62,7 @@ a:focus-visible {
 
 .light-panel {
   min-height: 0;
-  padding: clamp(22px, 4vw, 56px) var(--pad) clamp(26px, 3.5vw, 44px);
+  padding: clamp(22px, 4vw, 56px) var(--pad) clamp(22px, 3vw, 36px);
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: clamp(32px, 5vw, 56px);
@@ -170,8 +170,8 @@ h1 em {
 }
 
 .dark-panel {
-  min-height: clamp(180px, 24svh, 260px);
-  padding: clamp(28px, 3.5vw, 46px) var(--pad);
+  min-height: clamp(170px, 22svh, 230px);
+  padding: clamp(24px, 3vw, 36px) var(--pad);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
