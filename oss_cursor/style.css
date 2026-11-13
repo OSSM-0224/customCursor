@@ -233,7 +233,7 @@ h1 em {
   top: 0;
   left: 0;
   z-index: 2;
-  width: clamp(100px, 8.5vw, 130px);
+  width: clamp(30px, 3.5vw, 76px);
   opacity: 0;
   pointer-events: none;
   perspective: 900px;
