@@ -9,6 +9,8 @@
   const image = document.getElementById("cursor-image");
   const leftSleeve = document.getElementById("cursor-sleeve-left");
   const rightSleeve = document.getElementById("cursor-sleeve-right");
+  const threadCanvas = document.getElementById("cursor-thread");
+  const threadCtx = threadCanvas ? threadCanvas.getContext("2d") : null;
 
   if (
     !root ||
@@ -25,6 +27,10 @@
 
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const supportsDifference =
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("mix-blend-mode", "difference");
 
   const CONFIG = {
     gap: 22,
@@ -48,6 +54,14 @@
     snapDistance: 320,
     spawnX: 34,
     spawnY: 26,
+    threadLife: 620,
+    threadLengthRatio: 1.5,
+    threadMinLength: 46,
+    threadWidthRatio: 0.032,
+    threadMinWidth: 1.2,
+    threadMaxWidth: 3,
+    threadStepRatio: 0.03,
+    threadMaxPoints: 40,
   };
 
   const state = {
@@ -77,6 +91,7 @@
     raf: 0,
     running: false,
     lastHoverTarget: null,
+    trail: [],
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -84,12 +99,224 @@
     target + (current - target) * Math.exp(-lambda * dt);
   const canUse = () => finePointer.matches && !reducedMotion.matches;
 
+  function sizeThreadCanvas() {
+    if (!threadCanvas || !threadCtx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.round(window.innerWidth * dpr);
+    const height = Math.round(window.innerHeight * dpr);
+
+    if (threadCanvas.width !== width || threadCanvas.height !== height) {
+      threadCanvas.width = width;
+      threadCanvas.height = height;
+    }
+
+    threadCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function clearThread() {
+    state.trail.length = 0;
+
+    if (threadCtx) {
+      threadCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+  }
+
+  function paintThread(anchorX, anchorY, now) {
+    if (!threadCtx) return;
+
+    if (state.overText) {
+      clearThread();
+      return;
+    }
+
+    state.trail = state.trail.filter(
+      (point) => now - point.t < CONFIG.threadLife,
+    );
+
+    const minStep = Math.max(1.2, state.shirtW * CONFIG.threadStepRatio);
+    const minSpeed = Math.max(24, state.shirtW * 0.5);
+    const shirtSpeed = Math.hypot(state.vx, state.vy);
+    const last = state.trail[state.trail.length - 1];
+
+    if (
+      shirtSpeed > minSpeed &&
+      (!last || Math.hypot(anchorX - last.x, anchorY - last.y) >= minStep)
+    ) {
+      state.trail.push({ x: anchorX, y: anchorY, t: now });
+
+      if (state.trail.length > CONFIG.threadMaxPoints) {
+        state.trail.shift();
+      }
+    }
+
+    if (state.trail.length < 2) {
+      threadCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      return;
+    }
+
+    const newest = state.trail[state.trail.length - 1];
+    const strength = clamp(
+      1 - (now - newest.t) / CONFIG.threadLife,
+      0,
+      1,
+    );
+
+    // Add the live anchor so the thread stays attached while it fades.
+    const points = state.trail.slice();
+    const storedHead = points[points.length - 1];
+
+    if (Math.hypot(anchorX - storedHead.x, anchorY - storedHead.y) > 0.5) {
+      points.push({ x: anchorX, y: anchorY, t: now });
+    }
+
+    // Keep only the newest stretch of trail.
+    const maxLength = Math.max(
+      CONFIG.threadMinLength,
+      state.shirtW * CONFIG.threadLengthRatio,
+    );
+    let total = 0;
+    let start = 0;
+
+    for (let i = points.length - 1; i > 0; i -= 1) {
+      total += Math.hypot(
+        points[i].x - points[i - 1].x,
+        points[i].y - points[i - 1].y,
+      );
+
+      if (total > maxLength) {
+        start = i;
+        break;
+      }
+    }
+
+    const visible = points.slice(start);
+
+    threadCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+    if (visible.length < 2 || strength <= 0) return;
+
+    let pathLength = 0;
+    for (let i = visible.length - 1; i > 0; i -= 1) {
+      pathLength += Math.hypot(
+        visible[i].x - visible[i - 1].x,
+        visible[i].y - visible[i - 1].y,
+      );
+    }
+
+    // Let gravity bow the thread so it reads as loose cotton, not a laser.
+    const sagAmount = Math.min(7, pathLength * 0.18);
+    const pointsOut = visible.map((point, index) => {
+      const u = index / (visible.length - 1);
+      return {
+        x: point.x,
+        y: point.y + sagAmount * Math.sin(Math.PI * u),
+      };
+    });
+
+    const headWidth = clamp(
+      state.shirtW * CONFIG.threadWidthRatio,
+      CONFIG.threadMinWidth,
+      CONFIG.threadMaxWidth,
+    );
+    const count = pointsOut.length;
+    const left = [];
+    const right = [];
+
+    for (let i = 0; i < count; i += 1) {
+      const prev = pointsOut[Math.max(0, i - 1)];
+      const next = pointsOut[Math.min(count - 1, i + 1)];
+
+      let tx = next.x - prev.x;
+      let ty = next.y - prev.y;
+      const length = Math.hypot(tx, ty) || 1;
+      tx /= length;
+      ty /= length;
+
+      const u = count === 1 ? 1 : i / (count - 1);
+      const half = (headWidth * Math.pow(u, 0.85)) / 2;
+
+      left.push({
+        x: pointsOut[i].x - ty * half,
+        y: pointsOut[i].y + tx * half,
+      });
+      right.push({
+        x: pointsOut[i].x + ty * half,
+        y: pointsOut[i].y - tx * half,
+      });
+    }
+
+    threadCtx.globalAlpha = 0.88 * strength;
+    threadCtx.fillStyle = supportsDifference ? "#ffffff" : "#161616";
+
+    threadCtx.beginPath();
+    threadCtx.moveTo(left[0].x, left[0].y);
+
+    for (let i = 1; i < count; i += 1) {
+      threadCtx.lineTo(left[i].x, left[i].y);
+    }
+
+    for (let i = count - 1; i >= 0; i -= 1) {
+      threadCtx.lineTo(right[i].x, right[i].y);
+    }
+
+    threadCtx.closePath();
+    threadCtx.fill();
+
+    // Rounded head, hidden under the hem.
+    threadCtx.beginPath();
+    threadCtx.arc(
+      pointsOut[count - 1].x,
+      pointsOut[count - 1].y,
+      headWidth / 2,
+      0,
+      Math.PI * 2,
+    );
+    threadCtx.fill();
+
+    // Two short frayed fibres at the tail.
+    const tail = pointsOut[0];
+    const nextPoint = pointsOut[1];
+
+    let dx = tail.x - nextPoint.x;
+    let dy = tail.y - nextPoint.y;
+    const tailLength = Math.hypot(dx, dy);
+
+    if (tailLength > 0.01) {
+      dx /= tailLength;
+      dy /= tailLength;
+
+      const fibreLength = Math.min(6, state.shirtW * 0.1);
+      threadCtx.globalAlpha = 0.4 * strength;
+      threadCtx.lineWidth = Math.max(0.4, headWidth * 0.28);
+      threadCtx.lineCap = "round";
+
+      for (const spread of [-0.28, 0.24]) {
+        const cos = Math.cos(spread);
+        const sin = Math.sin(spread);
+
+        threadCtx.beginPath();
+        threadCtx.moveTo(tail.x, tail.y);
+        threadCtx.lineTo(
+          tail.x + (dx * cos - dy * sin) * fibreLength,
+          tail.y + (dx * sin + dy * cos) * fibreLength,
+        );
+        threadCtx.strokeStyle = threadCtx.fillStyle;
+        threadCtx.stroke();
+      }
+    }
+
+    threadCtx.globalAlpha = 1;
+  }
+
   function measure() {
     const rect = shirt.getBoundingClientRect();
     const cssWidth = Number.parseFloat(getComputedStyle(shirt).width);
 
     state.shirtW = rect.width || cssWidth || 120;
     state.shirtH = rect.height || state.shirtW * (375 / 400);
+
+    sizeThreadCanvas();
   }
 
   function getAnchor() {
@@ -122,7 +349,8 @@
   }
 
   function render(dt) {
-    const time = performance.now() * 0.001;
+    const now = performance.now();
+    const time = now * 0.001;
     const calm = state.hovered ? 0.35 : 1;
 
     const wantedTilt = state.hovered
@@ -203,6 +431,30 @@
         `translate3d(${labelX}px, ${labelY}px, 0) ` +
         `translate(${flipX ? "-100%" : "0"}, ${flipY ? "-100%" : "0"})`;
     }
+
+    // The thread leaves the lower-left hem, so follow the same tilt and bob
+    // that the float uses above.
+    const originX = state.shirtW * 0.52;
+    const originY = state.shirtH * 0.46;
+    const hemLocalX = (state.shirtW * 0.44 - originX) * state.scale;
+    const hemLocalY = (state.shirtH * 0.88 - originY) * state.scale;
+    const threadRotation = ((state.tilt + idleTilt) * Math.PI) / 180;
+    const threadBank = ((state.bank + idleBank) * Math.PI) / 180;
+    const hemX = hemLocalX * Math.cos(threadBank);
+    const anchorX =
+      state.x +
+      bobX +
+      originX +
+      hemX * Math.cos(threadRotation) -
+      hemLocalY * Math.sin(threadRotation);
+    const anchorY =
+      state.y +
+      bobY +
+      originY +
+      hemX * Math.sin(threadRotation) +
+      hemLocalY * Math.cos(threadRotation);
+
+    paintThread(anchorX, anchorY, now);
   }
 
   function tick(now) {
@@ -320,6 +572,12 @@
 
     document.documentElement.classList.add("has-shirt-body");
     root.classList.add("is-visible");
+    clearThread();
+
+    if (threadCanvas) {
+      threadCanvas.classList.add("is-visible");
+    }
+
     paintInitial();
 
     const target = document.elementFromPoint(state.targetX, state.targetY);
@@ -340,6 +598,12 @@
     setHover(false, "");
     document.documentElement.classList.remove("has-shirt-body");
     root.classList.remove("is-visible", "is-text", "is-hovering", "is-pressed");
+    clearThread();
+
+    if (threadCanvas) {
+      threadCanvas.classList.remove("is-visible");
+    }
+
     label.classList.remove("is-visible");
     label.textContent = "";
 
@@ -398,12 +662,14 @@
     if (document.hidden) {
       stopLoop();
     } else if (state.active) {
+      clearThread();
       startLoop();
     }
   }
 
   function onResize() {
     measure();
+    clearThread();
   }
 
   function onModeChange() {
