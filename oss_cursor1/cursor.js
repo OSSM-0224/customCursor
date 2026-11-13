@@ -1,27 +1,22 @@
-
 const cursor = document.querySelector(".shirt-cursor");
 const leftSleeve = document.querySelector(".sleeve-left");
 const rightSleeve = document.querySelector(".sleeve-right");
-const body = document.querySelector(".shirt-body");
 
-let mouse = {
-  x: window.innerWidth / 2,
-  y: window.innerHeight / 2,
-  previousX: window.innerWidth / 2,
-  previousY: window.innerHeight / 2
-};
+let targetX = window.innerWidth / 2;
+let targetY = window.innerHeight / 2;
+let x = targetX;
+let y = targetY;
+let lastX = targetX;
+let lastY = targetY;
+let velocityX = 0;
+let velocityY = 0;
+let shirtTilt = 0;
+let leftAngle = 0;
+let rightAngle = 0;
 
-let position = { x: mouse.x, y: mouse.y };
-let velocity = { x: 0, y: 0 };
-
-let rotation = { x: 0, y: 0, z: 0 };
-let sleeve = { left: 0, right: 0 };
-
-let lastTime = 0;
-
-window.addEventListener("mousemove", (e) => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+window.addEventListener("mousemove", (event) => {
+  targetX = event.clientX;
+  targetY = event.clientY;
   cursor.classList.add("is-visible");
 });
 
@@ -29,108 +24,39 @@ document.documentElement.addEventListener("mouseleave", () => {
   cursor.classList.remove("is-visible");
 });
 
-document.documentElement.addEventListener("mouseenter", () => {
-  cursor.classList.add("is-visible");
-});
+function animate() {
+  // Main shirt smoothly follows the pointer with a little inertia.
+  x += (targetX - x) * 0.17;
+  y += (targetY - y) * 0.17;
 
-function lerp(current, target, amount) {
-  return current + (target - current) * amount;
-}
+  velocityX = targetX - lastX;
+  velocityY = targetY - lastY;
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+  // Clamp the rotation so fast mouse movements do not flip the shirt.
+  const speedTilt = Math.max(-12, Math.min(12, velocityX * 0.22));
+  shirtTilt += (speedTilt - shirtTilt) * 0.10;
 
-function animate(time) {
-  const delta = Math.min((time - (lastTime || time)) / 16.67, 2);
-  lastTime = time;
+  // Each sleeve gets its own delayed swing, like loose fabric.
+  const leftTarget = Math.max(-13, Math.min(13, -velocityX * 0.28 + velocityY * 0.08));
+  const rightTarget = Math.max(-13, Math.min(13, velocityX * 0.25 - velocityY * 0.06));
+  leftAngle += (leftTarget - leftAngle) * 0.13;
+  rightAngle += (rightTarget - rightAngle) * 0.11;
 
-  // Mouse movement velocity
-  const moveX = mouse.x - mouse.previousX;
-  const moveY = mouse.y - mouse.previousY;
+  // Gentle idle float remains even when the mouse stops.
+  const time = performance.now();
+  const bob = Math.sin(time * 0.0035) * 2.5;
+  const idleSway = Math.sin(time * 0.0025) * 1.4;
 
-  velocity.x = lerp(velocity.x, moveX, 0.35);
-  velocity.y = lerp(velocity.y, moveY, 0.35);
+  cursor.style.transform =
+    `translate3d(${x}px, ${y + bob}px, 0) ` +
+    `translate(-50%, -50%) rotate(${shirtTilt + idleSway}deg)`;
 
-  mouse.previousX = mouse.x;
-  mouse.previousY = mouse.y;
+  leftSleeve.style.transform = `rotate(${leftAngle + Math.sin(time * 0.004) * 1.2}deg)`;
+  rightSleeve.style.transform = `rotate(${rightAngle - Math.sin(time * 0.0042) * 1.2}deg)`;
 
-  // Smooth cursor following
-  position.x = lerp(position.x, mouse.x, 0.14 * delta);
-  position.y = lerp(position.y, mouse.y, 0.14 * delta);
-
-  // Movement-based 3D rotation
-  const targetRotateY = clamp(velocity.x * 0.65, -22, 22);
-  const targetRotateX = clamp(-velocity.y * 0.55, -18, 18);
-
-  rotation.x = lerp(rotation.x, targetRotateX, 0.09 * delta);
-  rotation.y = lerp(rotation.y, targetRotateY, 0.09 * delta);
-
-  // Gentle idle movement
-  const float = Math.sin(time * 0.0025) * 5;
-  const breathe = Math.sin(time * 0.003) * 2;
-  const idleRotate = Math.sin(time * 0.0018) * 3;
-
-  rotation.z = lerp(
-    rotation.z,
-    clamp(velocity.x * 0.16, -8, 8),
-    0.08 * delta
-  );
-
-  // Sleeve movement — independent fabric swing
-  const leftTarget = clamp(
-    -velocity.x * 0.3 + velocity.y * 0.12,
-    -15,
-    15
-  );
-
-  const rightTarget = clamp(
-    velocity.x * 0.3 - velocity.y * 0.12,
-    -15,
-    15
-  );
-
-  sleeve.left = lerp(sleeve.left, leftTarget, 0.12 * delta);
-  sleeve.right = lerp(sleeve.right, rightTarget, 0.12 * delta);
-
-  const leftIdle = Math.sin(time * 0.004) * 2.5;
-  const rightIdle = Math.sin(time * 0.0045 + 1) * 2.5;
-
-  // Slight stretch while moving
-  const speed = Math.min(
-    Math.hypot(velocity.x, velocity.y) / 35,
-    1
-  );
-
-  const scale = 1 + speed * 0.025 + breathe * 0.001;
-
-  // Apply main jersey animation
-  cursor.style.transform = `
-    translate3d(${position.x}px, ${position.y + float}px, 0)
-    translate(-50%, -50%)
-    perspective(700px)
-    rotateX(${rotation.x}deg)
-    rotateY(${rotation.y}deg)
-    rotateZ(${rotation.z + idleRotate}deg)
-    scale(${scale})
-  `;
-
-  // Left sleeve
-  leftSleeve.style.transform = `
-    rotate(${sleeve.left + leftIdle}deg)
-  `;
-
-  // Right sleeve
-  rightSleeve.style.transform = `
-    rotate(${sleeve.right + rightIdle}deg)
-  `;
-
-  // Subtle body movement
-  body.style.transform = `
-    translateY(${Math.sin(time * 0.003) * 1.5}px)
-  `;
-
+  lastX = targetX;
+  lastY = targetY;
   requestAnimationFrame(animate);
 }
 
-requestAnimationFrame(animate);
+animate();

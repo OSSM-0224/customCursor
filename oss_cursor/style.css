@@ -318,18 +318,18 @@ h1 em {
 
 /* Only hide the native cursor once the custom cursor is actually active. */
 @media (hover: hover) and (pointer: fine) {
-  html.has-shirt-cursor,
-  html.has-shirt-cursor body,
-  html.has-shirt-cursor a,
-  html.has-shirt-cursor button,
-  html.has-shirt-cursor [role="button"] {
+  html.has-shirt-body,
+  html.has-shirt-body body,
+  html.has-shirt-body a,
+  html.has-shirt-body button,
+  html.has-shirt-body [role="button"] {
     cursor: none;
   }
 
-  html.has-shirt-cursor input,
-  html.has-shirt-cursor textarea,
-  html.has-shirt-cursor select,
-  html.has-shirt-cursor [contenteditable="true"] {
+  html.has-shirt-body input,
+  html.has-shirt-body textarea,
+  html.has-shirt-body select,
+  html.has-shirt-body [contenteditable="true"] {
     cursor: text;
   }
 }
@@ -346,11 +346,11 @@ h1 em {
     display: none !important;
   }
 
-  html.has-shirt-cursor,
-  html.has-shirt-cursor body,
-  html.has-shirt-cursor a,
-  html.has-shirt-cursor button,
-  html.has-shirt-cursor [role="button"] {
+  html.has-shirt-body,
+  html.has-shirt-body body,
+  html.has-shirt-body a,
+  html.has-shirt-body button,
+  html.has-shirt-body [role="button"] {
     cursor: auto;
   }
 }
@@ -360,7 +360,7 @@ h1 em {
     display: none !important;
   }
 
-  html.has-shirt-cursor * {
+  html.has-shirt-body * {
     cursor: auto !important;
   }
 }
