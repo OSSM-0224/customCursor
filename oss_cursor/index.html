@@ -3,13 +3,64 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OSS CURSOR</title>
+    <meta
+      name="description"
+      content="A smooth floating jersey custom cursor with a precise dot, soft spring motion and accessible fallbacks."
+    />
+    <title>Floating Jersey Cursor</title>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div id="main">
-      <div id="cursor"></div>
+    <main class="page">
+      <section class="light-panel" aria-labelledby="page-title">
+        <header class="meta">
+          <span>01</span>
+          <span>Floating jersey cursor</span>
+        </header>
+
+        <div class="intro">
+          <p class="eyebrow">A custom cursor study</p>
+          <h1 id="page-title">Move your <em>mouse.</em></h1>
+          <p class="lede">
+            A soft-following jersey with a precise dot. It drifts, banks and
+            settles without ever getting in the way.
+          </p>
+          <nav class="links" aria-label="Cursor test links">
+            <a href="#" data-cursor="View">Hover this link</a>
+            <a href="#">And this one</a>
+          </nav>
+        </div>
+
+        <p class="note">Fine pointers only · Reduced motion respected</p>
+      </section>
+
+      <section class="dark-panel" aria-label="Dark background cursor test">
+        <div class="dark-top">
+          <p class="eyebrow">Contrast check</p>
+          <p class="dark-title">Same cursor.<br /><span>Dark ground.</span></p>
+        </div>
+        <a href="#" data-cursor="View">Test the dark side</a>
+      </section>
+    </main>
+
+    <div class="cursor" id="cursor" aria-hidden="true">
+      <div class="cursor__shirt" id="cursor-shirt">
+        <div class="cursor__float" id="cursor-float">
+          <img
+            class="cursor__image"
+            id="cursor-image"
+            src="shirt.png"
+            width="400"
+            height="375"
+            alt=""
+            draggable="false"
+          />
+        </div>
+      </div>
+      <span class="cursor__dot" id="cursor-dot"></span>
+      <span class="cursor__label" id="cursor-label"></span>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/gsap.min.js"></script>
+
     <script src="script.js"></script>
   </body>
 </html>
