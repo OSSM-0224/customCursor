@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Floating T-shirt Cursor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <span class="eyebrow">INTERACTIVE CURSOR EXPERIMENT</span>
+      <h1>Move your mouse.</h1>
+      <p>The T-shirt follows smoothly while its sleeves sway independently.</p>
+      <a href="#">Hover this link</a>
+    </main>
+
+    <div class="shirt-cursor" aria-hidden="true">
+      <img class="shirt-part sleeve sleeve-left" src="sleeve-left.png" alt="" />
+      <img
+        class="shirt-part sleeve sleeve-right"
+        src="sleeve-right.png"
+        alt=""
+      />
+      <img class="shirt-part shirt-body" src="shirt-body.png" alt="" />
+    </div>
+
+    <script src="cursor.js"></script>
+  </body>
+</html>
